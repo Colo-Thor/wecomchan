@@ -1,16 +1,17 @@
 package main
 
 import (
-	"context"
+	"encoding/json"
 	"fmt"
+	"huaweicloud.com/go-runtime/events/apig"
+	"huaweicloud.com/go-runtime/go-api/context"
+	"huaweicloud.com/go-runtime/pkg/runtime"
 	"strings"
 
 	"github.com/riba2534/wecomchan/go-scf/consts"
 	"github.com/riba2534/wecomchan/go-scf/dal"
 	"github.com/riba2534/wecomchan/go-scf/service"
 	"github.com/riba2534/wecomchan/go-scf/utils"
-	"github.com/tencentyun/scf-go-lib/cloudfunction"
-	"github.com/tencentyun/scf-go-lib/events"
 )
 
 func init() {
@@ -28,9 +29,16 @@ func init() {
 	fmt.Println("os.env load success!")
 }
 
-func HTTPHandler(ctx context.Context, event events.APIGatewayRequest) (events.APIGatewayResponse, error) {
+func HTTPHandler(payload []byte, ctx context.RuntimeContext) (interface{}, error) {
+	var event apig.APIGTriggerEvent
+	err := json.Unmarshal(payload, &event)
+	if err != nil {
+		fmt.Println("Unmarshal failed")
+		return "invalid data", err
+	}
+
 	path := event.Path
-	fmt.Println("req->", utils.MarshalToStringParam(event))
+	fmt.Println("req->", event.String())
 	var result interface{}
 	if strings.HasPrefix(path, "/"+consts.FUNC_NAME) {
 		result = service.WeComChanService(ctx, event)
@@ -38,15 +46,18 @@ func HTTPHandler(ctx context.Context, event events.APIGatewayRequest) (events.AP
 		// 匹配失败返回原始HTTP请求
 		result = event
 	}
-	return events.APIGatewayResponse{
+
+	return apig.APIGTriggerResponse{
 		IsBase64Encoded: false,
 		StatusCode:      200,
-		Headers:         map[string]string{},
-		Body:            utils.MarshalToStringParam(result),
-	}, nil
+		Headers: map[string]string{
+			"content-type": "application/json",
+		},
+		Body: utils.MarshalToStringParam(result),
+	}, err
 }
 
 func main() {
 	dal.Init()
-	cloudfunction.Start(HTTPHandler)
+	runtime.Register(HTTPHandler)
 }

@@ -1,6 +1,7 @@
 package dal
 
 import (
+	"crypto/tls"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -14,7 +15,10 @@ import (
 var AccessToken string
 
 func loadAccessToken() {
-	client := http.Client{Timeout: 10 * time.Second}
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	}
+	client := http.Client{Timeout: 10 * time.Second, Transport: tr}
 	req, _ := http.NewRequest("GET", fmt.Sprintf(consts.WeComAccessTokenURL, consts.WECOM_CID, consts.WECOM_SECRET), nil)
 	resp, err := client.Do(req)
 	if err != nil {

@@ -2,9 +2,11 @@ package service
 
 import (
 	"bytes"
-	"context"
+	"crypto/tls"
+	"encoding/base64"
 	"errors"
 	"fmt"
+	"huaweicloud.com/go-runtime/events/apig"
 	"io/ioutil"
 	"net/http"
 	"time"
@@ -14,10 +16,10 @@ import (
 	"github.com/riba2534/wecomchan/go-scf/dal"
 	"github.com/riba2534/wecomchan/go-scf/model"
 	"github.com/riba2534/wecomchan/go-scf/utils"
-	"github.com/tencentyun/scf-go-lib/events"
+	"huaweicloud.com/go-runtime/go-api/context"
 )
 
-func WeComChanService(ctx context.Context, event events.APIGatewayRequest) map[string]interface{} {
+func WeComChanService(ctx context.RuntimeContext, event apig.APIGTriggerEvent) map[string]interface{} {
 	sendKey := getQuery("sendkey", event)
 	msgType := getQuery("msg_type", event)
 	msg := getQuery("msg", event)
@@ -48,7 +50,10 @@ func postWechatMsg(accessToken, msg, msgType, toUser string) error {
 		},
 	}
 	b, _ := jsoniter.Marshal(content)
-	client := http.Client{Timeout: 10 * time.Second}
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	}
+	client := http.Client{Timeout: 10 * time.Second, Transport: tr}
 	req, _ := http.NewRequest("POST", fmt.Sprintf(consts.WeComMsgSendURL, accessToken), bytes.NewBuffer(b))
 	req.Header.Set("Content-type", "application/json")
 	resp, err := client.Do(req)
@@ -74,15 +79,23 @@ func postWechatMsg(accessToken, msg, msgType, toUser string) error {
 	return nil
 }
 
-func getQuery(key string, event events.APIGatewayRequest) string {
-	switch event.Method {
+func getQuery(key string, event apig.APIGTriggerEvent) string {
+	switch event.HttpMethod {
 	case "GET":
-		value := event.QueryString[key]
-		if len(value) > 0 && value[0] != "" {
-			return value[0]
+		value := event.QueryStringParameters[key]
+		if len(value) > 0 && value != "" {
+			return value
 		}
 		return ""
 	case "POST":
+		if event.IsBase64Encoded {
+			bytes, err := base64.StdEncoding.DecodeString(event.Body)
+			if err != nil {
+				return ""
+			}
+			event.Body = string(bytes)
+			event.IsBase64Encoded = false
+		}
 		return jsoniter.Get([]byte(event.Body), key).ToString()
 	default:
 		return ""
