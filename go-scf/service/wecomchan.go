@@ -3,7 +3,6 @@ package service
 import (
 	"bytes"
 	"crypto/tls"
-	"encoding/base64"
 	"errors"
 	"fmt"
 	"huaweicloud.com/go-runtime/events/apig"
@@ -89,12 +88,7 @@ func getQuery(key string, event apig.APIGTriggerEvent) string {
 		return ""
 	case "POST":
 		if event.IsBase64Encoded {
-			bytes, err := base64.StdEncoding.DecodeString(event.Body)
-			if err != nil {
-				return ""
-			}
-			event.Body = string(bytes)
-			event.IsBase64Encoded = false
+			return jsoniter.Get([]byte(event.GetRawBody()), key).ToString()
 		}
 		return jsoniter.Get([]byte(event.Body), key).ToString()
 	default:

@@ -7,7 +7,6 @@ import (
 	"huaweicloud.com/go-runtime/go-api/context"
 	"huaweicloud.com/go-runtime/pkg/runtime"
 	"strings"
-
 	"github.com/riba2534/wecomchan/go-scf/consts"
 	"github.com/riba2534/wecomchan/go-scf/dal"
 	"github.com/riba2534/wecomchan/go-scf/service"
@@ -34,17 +33,24 @@ func HTTPHandler(payload []byte, ctx context.RuntimeContext) (interface{}, error
 	err := json.Unmarshal(payload, &event)
 	if err != nil {
 		fmt.Println("Unmarshal failed")
-		return "invalid data", err
+		return apig.APIGTriggerResponse{
+			IsBase64Encoded: false,
+			StatusCode:      200,
+			Headers: map[string]string{
+				"content-type": "application/json",
+			},
+			Body: utils.MarshalToStringParam(utils.MakeResp(-1, "invalid data")),
+		}, err
 	}
 
 	path := event.Path
-	fmt.Println("req->", event.String())
+	//fmt.Println("req->", event.String())
 	var result interface{}
-	if strings.HasPrefix(path, "/"+consts.FUNC_NAME) {
+	if strings.HasPrefix(path, "/release/"+consts.FUNC_NAME) {
 		result = service.WeComChanService(ctx, event)
 	} else {
 		// 匹配失败返回原始HTTP请求
-		result = event
+		result = utils.MakeResp(-1, "path error")
 	}
 
 	return apig.APIGTriggerResponse{

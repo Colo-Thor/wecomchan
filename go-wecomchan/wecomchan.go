@@ -11,7 +11,6 @@ import (
 	"os"
 	"reflect"
 	"time"
-
 	"github.com/go-redis/redis/v8"
 )
 
@@ -67,7 +66,7 @@ func redis_client() *redis.Client {
 	return rdb
 }
 
-func post_msg(text_msg, msg_type, post_url string) string {
+func post_msg(text_msg, msg_type, to_user, post_url string) string {
 	type msg struct {
 		Content string `json:"content"`
 	}
@@ -79,7 +78,7 @@ func post_msg(text_msg, msg_type, post_url string) string {
 		Duplicate_check_interval int    `json:"duplicate_check_interval"`
 	}
 	post_data := JsonData{
-		Touser:                   WECOM_TOUID,
+		Touser:                   to_user,
 		Agentid:                  WECOM_AID,
 		Msgtype:                  msg_type,
 		Duplicate_check_interval: 600,
@@ -134,7 +133,11 @@ func main() {
 		}
 		msg := req.FormValue("msg")
 		msg_type := req.FormValue("msg_type")
-		post_status := post_msg(msg, msg_type, post_url)
+		to_user := req.FormValue("to_user")
+		if to_user == "" {
+			to_user = WECOM_TOUID
+		}
+		post_status := post_msg(msg, msg_type, to_user, post_url)
 		log.Println(post_status)
 		post_response := praser_json(string(post_status))
 		log.Println(post_response)
